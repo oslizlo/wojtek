@@ -1,14 +1,71 @@
 <!DOCTYPE html>
-<html>
+<html lang="pl">
 <head>
-    <title>Moja pierwsza strona</title>
+    <meta charset="UTF-8">
+    <title>Lista klientów z CSV</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        ul { margin-top: 20px; }
+    </style>
 </head>
 <body>
-    <h1>Cześć świecie! 🚀</h1>
-    <p>To moja pierwsza strona na GitHub Pages.</p>
 
-    <button onclick="alert('Działa JavaScript!')">
-        Kliknij mnie
-    </button>
+<h2>Wczytaj plik CSV z klientami</h2>
+<input type="file" id="fileInput" accept=".csv">
+<ul id="lista"></ul>
+
+<script>
+document.getElementById("fileInput").addEventListener("change", function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+        const text = e.target.result;
+        const klienci = parseCSV(text);
+        const posortowani = sortujAlfabetycznie(klienci);
+        wyswietlListe(posortowani);
+    };
+
+    reader.readAsText(file);
+});
+
+function parseCSV(text) {
+    const linie = text.trim().split("\n");
+    const naglowki = linie[0].split(",");
+
+    const klienci = [];
+
+    for (let i = 1; i < linie.length; i++) {
+        const dane = linie[i].split(",");
+        klienci.push({
+            id: dane[0],
+            nazwa: dane[1],
+            wartosc: dane[2]
+        });
+    }
+
+    return klienci;
+}
+
+function sortujAlfabetycznie(klienci) {
+    return klienci.sort((a, b) => 
+        a.nazwa.localeCompare(b.nazwa, 'pl', { sensitivity: 'base' })
+    );
+}
+
+function wyswietlListe(klienci) {
+    const lista = document.getElementById("lista");
+    lista.innerHTML = "";
+
+    klienci.forEach(klient => {
+        const li = document.createElement("li");
+        li.textContent = `ID: ${klient.id} | ${klient.nazwa} | Wartość: ${klient.wartosc}`;
+        lista.appendChild(li);
+    });
+}
+</script>
+
 </body>
 </html>
