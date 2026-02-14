@@ -2,17 +2,18 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<title>Sortowanie klientów z CSV</title>
+<title>Lista klientów CSV</title>
 <style>
     body { font-family: Arial; padding: 20px; }
-    button { margin-top: 10px; padding: 8px 15px; cursor: pointer; }
+    button { margin-top: 10px; padding: 8px 16px; cursor: pointer; }
     ul { margin-top: 20px; }
-    #status { margin-top: 10px; font-weight: bold; }
+    li { margin-bottom: 5px; }
+    #status { margin-top: 15px; font-weight: bold; }
 </style>
 </head>
 <body>
 
-<h2>Wczytaj plik CSV z klientami</h2>
+<h2>Lista klientów z pliku CSV</h2>
 
 <input type="file" id="fileInput" accept=".csv">
 <br>
@@ -22,14 +23,14 @@
 <ul id="lista"></ul>
 
 <script>
-let wczytaniKlienci = [];
+let klienci = [];
 
 const fileInput = document.getElementById("fileInput");
 const sortBtn = document.getElementById("sortBtn");
 const lista = document.getElementById("lista");
 const statusDiv = document.getElementById("status");
 
-// KROK 1: Wczytywanie pliku (bez sortowania)
+// Wczytywanie pliku
 fileInput.addEventListener("change", function(event) {
     const file = event.target.files[0];
 
@@ -38,27 +39,82 @@ fileInput.addEventListener("change", function(event) {
         return;
     }
 
-    statusDiv.textContent = "Status: Wczytywanie pliku...";
     const reader = new FileReader();
+    statusDiv.textContent = "Status: Wczytywanie pliku CSV...";
 
     reader.onload = function(e) {
-        try {
-            const text = e.target.result;
-            wczytaniKlienci = parseCSV(text);
+        const text = e.target.result;
+        klienci = parseCSV(text);
 
-            if (wczytaniKlienci.length === 0) {
-                statusDiv.textContent = "Status: Nie wykryto danych w pliku CSV.";
-            } else {
-                statusDiv.textContent = `Status: Wczytano ${wczytaniKlienci.length} klientów. Kliknij 'Sortuj alfabetycznie'.`;
-            }
-        } catch (error) {
-            console.error(error);
-            statusDiv.textContent = "Status: Błąd odczytu CSV.";
+        if (klienci.length === 0) {
+            statusDiv.textContent = "Status: Nie znaleziono danych w CSV.";
+        } else {
+            statusDiv.textContent = `Status: Wczytano ${klienci.length} klientów. Kliknij 'Sortuj alfabetycznie'.`;
         }
     };
 
     reader.readAsText(file, "UTF-8");
 });
 
-// KROK 2: Sortowanie po kliknięciu przycisku
-sortBtn.addEventL
+// Sortowanie po kliknięciu
+sortBtn.addEventListener("click", function() {
+    if (klienci.length === 0) {
+        statusDiv.textContent = "Status: Najpierw wczytaj plik CSV!";
+        return;
+    }
+
+    const posortowani = [...klienci].sort((a, b) =>
+        a.nazwa.localeCompare(b.nazwa, 'pl', { sensitivity: 'base' })
+    );
+
+    wyswietlListe(posortowani);
+    statusDiv.textContent = "Status: Wyświetlono klientów posortowanych alfabetycznie.";
+});
+
+// Parser dopasowany do: ID;Nazwa;wartosc + "cudzysłowy"
+function parseCSV(text) {
+    // Usunięcie BOM z Excela
+    text = text.replace(/^\uFEFF/, "");
+
+    const linie = text.trim().split(/\r?\n/);
+
+    if (linie.length < 2) return [];
+
+    const separator = ";"; // Twój plik używa średników
+
+    const wynik = [];
+
+    for (let i = 1; i < linie.length; i++) {
+        let linia = linie[i].trim();
+        if (!linia) continue;
+
+        // Rozbijanie po średnikach
+        let kolumny = linia.split(separator);
+
+        // Usuwanie cudzysłowów z każdej kolumny
+        kolumny = kolumny.map(k => k.replace(/^"|"$/g, "").trim());
+
+        const id = kolumny[0] || "";
+        const nazwa = kolumny[1] || "";
+        const wartosc = kolumny[2] || "";
+
+        wynik.push({ id, nazwa, wartosc });
+    }
+
+    return wynik;
+}
+
+// Wyświetlanie listy
+function wyswietlListe(listaKlientow) {
+    lista.innerHTML = "";
+
+    listaKlientow.forEach(klient => {
+        const li = document.createElement("li");
+        li.textContent = `ID: ${klient.id} | ${klient.nazwa} | Wartość: ${klient.wartosc}`;
+        lista.appendChild(li);
+    });
+}
+</script>
+
+</body>
+</html>
