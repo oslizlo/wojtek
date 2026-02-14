@@ -54,4 +54,93 @@ fileInput.addEventListener("change", function(event) {
         podsumowanieDiv.textContent = "";
 
         if (klienci.length === 0) {
-            statusDiv.textContent = "Status: Nie znaleziono
+            statusDiv.textContent = "Status: Nie znaleziono danych w CSV.";
+        } else {
+            statusDiv.textContent = `Status: Wczytano ${klienci.length} klientów.`;
+        }
+    };
+
+    reader.readAsText(file, "UTF-8");
+});
+
+// Sortowanie alfabetyczne
+sortBtn.addEventListener("click", function() {
+    if (klienci.length === 0) {
+        statusDiv.textContent = "Status: Najpierw wczytaj plik CSV!";
+        return;
+    }
+
+    const posortowani = [...klienci].sort((a, b) =>
+        a.nazwa.localeCompare(b.nazwa, 'pl', { sensitivity: 'base' })
+    );
+
+    wyswietlListe(posortowani);
+    statusDiv.textContent = "Status: Lista klientów posortowana alfabetycznie.";
+});
+
+// Sumowanie wartości
+sumBtn.addEventListener("click", function() {
+    if (klienci.length === 0) {
+        statusDiv.textContent = "Status: Najpierw wczytaj plik CSV!";
+        return;
+    }
+
+    let suma = 0;
+
+    klienci.forEach(klient => {
+        // Zamiana tekstu na liczbę (obsługa np. 64.00 lub 64,00)
+        let wartosc = klient.wartosc.replace(",", ".");
+        let liczba = parseFloat(wartosc);
+
+        if (!isNaN(liczba)) {
+            suma += liczba;
+        }
+    });
+
+    podsumowanieDiv.textContent = "Suma wartości wszystkich klientów: " + suma.toFixed(2);
+    statusDiv.textContent = "Status: Obliczono sumę wartości.";
+});
+
+// Parser CSV dopasowany do: ; oraz "cudzysłowy"
+function parseCSV(text) {
+    text = text.replace(/^\uFEFF/, ""); // usunięcie BOM (Excel)
+
+    const linie = text.trim().split(/\r?\n/);
+    if (linie.length < 2) return [];
+
+    const separator = ";";
+    const wynik = [];
+
+    for (let i = 1; i < linie.length; i++) {
+        let linia = linie[i].trim();
+        if (!linia) continue;
+
+        let kolumny = linia.split(separator);
+
+        // Usuwanie cudzysłowów i spacji
+        kolumny = kolumny.map(k => k.replace(/^"|"$/g, "").trim());
+
+        const id = kolumny[0] || "";
+        const nazwa = kolumny[1] || "";
+        const wartosc = kolumny[2] || "0";
+
+        wynik.push({ id, nazwa, wartosc });
+    }
+
+    return wynik;
+}
+
+// Wyświetlanie listy klientów
+function wyswietlListe(listaKlientow) {
+    lista.innerHTML = "";
+
+    listaKlientow.forEach(klient => {
+        const li = document.createElement("li");
+        li.textContent = `ID: ${klient.id} | ${klient.nazwa} | Wartość: ${klient.wartosc}`;
+        lista.appendChild(li);
+    });
+}
+</script>
+
+</body>
+</html>
