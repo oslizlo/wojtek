@@ -2,35 +2,40 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<title>Lista klientów CSV</title>
+<title>Analiza klientów CSV</title>
 <style>
     body { font-family: Arial; padding: 20px; }
-    button { margin-top: 10px; padding: 8px 16px; cursor: pointer; }
+    button { margin-top: 10px; margin-right: 10px; padding: 8px 16px; cursor: pointer; }
     ul { margin-top: 20px; }
     li { margin-bottom: 5px; }
     #status { margin-top: 15px; font-weight: bold; }
+    #podsumowanie { margin-top: 20px; font-size: 18px; font-weight: bold; color: green; }
 </style>
 </head>
 <body>
 
-<h2>Lista klientów z pliku CSV</h2>
+<h2>Analiza klientów z pliku CSV</h2>
 
 <input type="file" id="fileInput" accept=".csv">
 <br>
 <button id="sortBtn">Sortuj alfabetycznie</button>
+<button id="sumBtn">Sumuj wartość</button>
 
 <div id="status">Status: Nie wczytano pliku</div>
 <ul id="lista"></ul>
+<div id="podsumowanie"></div>
 
 <script>
 let klienci = [];
 
 const fileInput = document.getElementById("fileInput");
 const sortBtn = document.getElementById("sortBtn");
+const sumBtn = document.getElementById("sumBtn");
 const lista = document.getElementById("lista");
 const statusDiv = document.getElementById("status");
+const podsumowanieDiv = document.getElementById("podsumowanie");
 
-// Wczytywanie pliku
+// Wczytywanie pliku CSV
 fileInput.addEventListener("change", function(event) {
     const file = event.target.files[0];
 
@@ -45,76 +50,8 @@ fileInput.addEventListener("change", function(event) {
     reader.onload = function(e) {
         const text = e.target.result;
         klienci = parseCSV(text);
+        lista.innerHTML = "";
+        podsumowanieDiv.textContent = "";
 
         if (klienci.length === 0) {
-            statusDiv.textContent = "Status: Nie znaleziono danych w CSV.";
-        } else {
-            statusDiv.textContent = `Status: Wczytano ${klienci.length} klientów. Kliknij 'Sortuj alfabetycznie'.`;
-        }
-    };
-
-    reader.readAsText(file, "UTF-8");
-});
-
-// Sortowanie po kliknięciu
-sortBtn.addEventListener("click", function() {
-    if (klienci.length === 0) {
-        statusDiv.textContent = "Status: Najpierw wczytaj plik CSV!";
-        return;
-    }
-
-    const posortowani = [...klienci].sort((a, b) =>
-        a.nazwa.localeCompare(b.nazwa, 'pl', { sensitivity: 'base' })
-    );
-
-    wyswietlListe(posortowani);
-    statusDiv.textContent = "Status: Wyświetlono klientów posortowanych alfabetycznie.";
-});
-
-// Parser dopasowany do: ID;Nazwa;wartosc + "cudzysłowy"
-function parseCSV(text) {
-    // Usunięcie BOM z Excela
-    text = text.replace(/^\uFEFF/, "");
-
-    const linie = text.trim().split(/\r?\n/);
-
-    if (linie.length < 2) return [];
-
-    const separator = ";"; // Twój plik używa średników
-
-    const wynik = [];
-
-    for (let i = 1; i < linie.length; i++) {
-        let linia = linie[i].trim();
-        if (!linia) continue;
-
-        // Rozbijanie po średnikach
-        let kolumny = linia.split(separator);
-
-        // Usuwanie cudzysłowów z każdej kolumny
-        kolumny = kolumny.map(k => k.replace(/^"|"$/g, "").trim());
-
-        const id = kolumny[0] || "";
-        const nazwa = kolumny[1] || "";
-        const wartosc = kolumny[2] || "";
-
-        wynik.push({ id, nazwa, wartosc });
-    }
-
-    return wynik;
-}
-
-// Wyświetlanie listy
-function wyswietlListe(listaKlientow) {
-    lista.innerHTML = "";
-
-    listaKlientow.forEach(klient => {
-        const li = document.createElement("li");
-        li.textContent = `ID: ${klient.id} | ${klient.nazwa} | Wartość: ${klient.wartosc}`;
-        lista.appendChild(li);
-    });
-}
-</script>
-
-</body>
-</html>
+            statusDiv.textContent = "Status: Nie znaleziono
