@@ -1,71 +1,78 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-    <meta charset="UTF-8">
-    <title>Lista klientów z CSV</title>
-    <style>
-        body { font-family: Arial; padding: 20px; }
-        ul { margin-top: 20px; }
-    </style>
+<meta charset="UTF-8">
+<title>Lista klientów z CSV</title>
+<style>
+    body { font-family: Arial; padding: 20px; }
+    ul { margin-top: 20px; }
+    #status { margin-top: 10px; color: red; }
+</style>
 </head>
 <body>
 
 <h2>Wczytaj plik CSV z klientami</h2>
 <input type="file" id="fileInput" accept=".csv">
+<div id="status"></div>
 <ul id="lista"></ul>
 
 <script>
-document.getElementById("fileInput").addEventListener("change", function(event) {
-    const file = event.target.files[0];
-    if (!file) return;
+const input = document.getElementById("fileInput");
+const lista = document.getElementById("lista");
+const statusDiv = document.getElementById("status");
 
+input.addEventListener("change", handleFile);
+
+function handleFile(event) {
+    const file = event.target.files[0];
+    if (!file) {
+        statusDiv.textContent = "Nie wybrano pliku.";
+        return;
+    }
+
+    statusDiv.textContent = "Wczytywanie pliku...";
     const reader = new FileReader();
 
     reader.onload = function(e) {
-        const text = e.target.result;
-        const klienci = parseCSV(text);
-        const posortowani = sortujAlfabetycznie(klienci);
-        wyswietlListe(posortowani);
+        try {
+            const text = e.target.result;
+            console.log("Surowy CSV:", text);
+
+            const klienci = parseCSV(text);
+
+            if (klienci.length === 0) {
+                statusDiv.textContent = "Plik CSV jest pusty lub ma zły format.";
+                return;
+            }
+
+            const posortowani = sortujAlfabetycznie(klienci);
+            wyswietlListe(posortowani);
+            statusDiv.textContent = `Wczytano ${posortowani.length} klientów.`;
+        } catch (err) {
+            statusDiv.textContent = "Błąd podczas przetwarzania pliku: " + err.message;
+            console.error(err);
+        }
     };
 
-    reader.readAsText(file);
-});
+    reader.onerror = () => {
+        statusDiv.textContent = "Błąd odczytu pliku.";
+    };
+
+    reader.readAsText(file, "UTF-8");
+}
 
 function parseCSV(text) {
-    const linie = text.trim().split("\n");
-    const naglowki = linie[0].split(",");
+    // Usuwanie BOM (częsty problem z Excel)
+    text = text.replace(/^\uFEFF/, "");
 
-    const klienci = [];
+    const linie = text.trim().split(/\r?\n/);
 
-    for (let i = 1; i < linie.length; i++) {
-        const dane = linie[i].split(",");
-        klienci.push({
-            id: dane[0],
-            nazwa: dane[1],
-            wartosc: dane[2]
-        });
-    }
+    if (linie.length < 2) return [];
 
-    return klienci;
-}
+    // Automatyczne wykrycie separatora (; lub ,)
+    const separator = linie[0].includes(";") ? ";" : ",";
 
-function sortujAlfabetycznie(klienci) {
-    return klienci.sort((a, b) => 
-        a.nazwa.localeCompare(b.nazwa, 'pl', { sensitivity: 'base' })
-    );
-}
-
-function wyswietlListe(klienci) {
-    const lista = document.getElementById("lista");
-    lista.innerHTML = "";
-
-    klienci.forEach(klient => {
-        const li = document.createElement("li");
-        li.textContent = `ID: ${klient.id} | ${klient.nazwa} | Wartość: ${klient.wartosc}`;
-        lista.appendChild(li);
-    });
-}
-</script>
-
-</body>
-</html>
+    const naglowki = linie[0].split(separator).map(h => h.trim().toLowerCase());
+    const indexId = naglowki.findIndex(h => h.includes("id"));
+    const indexNazwa = naglowki.findIndex(h => h.includes("nazwa") || h.includes("klient") || h.includes("name"));
+    const indexWartosc = naglowki.findIndex(h => h.includes("wartosc")
