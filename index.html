@@ -4,59 +4,200 @@
 <meta charset="UTF-8">
 <title>Analiza CSV klientów</title>
 <style>
-    body {
-        font-family: Arial;
-        margin: 20px;
-        background: #f5f5f5;
-    }
-    button {
-        margin: 5px;
-        padding: 10px 15px;
-        cursor: pointer;
-    }
-    table {
-        border-collapse: collapse;
-        margin-top: 20px;
-        width: 100%;
-        background: white;
-    }
-    th, td {
-        border: 1px solid #ccc;
-        padding: 8px;
-        text-align: left;
-    }
-    th {
-        background: #eee;
-    }
+body { font-family: Arial; margin: 20px; }
+button { padding: 10px; margin: 5px; cursor: pointer; }
+table { border-collapse: collapse; margin-top: 20px; width: 100%; }
+th, td { border: 1px solid #ccc; padding: 8px; }
+th { background: #f0f0f0; }
 </style>
 </head>
 <body>
 
-<h2>Wczytaj plik CSV klientów</h2>
+<h2>Wczytaj plik CSV</h2>
 
 <input type="file" id="fileInput" accept=".csv">
 <br>
 <button onclick="groupByID()">Grupuj po ID</button>
-<button onclick="sumByCustomer()">Sumuj wartości klientów</button>
+<button onclick="sumByCustomer()">Sumuj wartości klientów (netto)</button>
 
+<div id="status"></div>
 <div id="output"></div>
 
 <script>
 let csvData = [];
-let groupedData = [];
 
-// Wczytywanie pliku CSV
+// POPRAWNY parser CSV (obsługa cudzysłowów)
+function parseCSV(text) {
+    const rows = [];
+    const lines = text.replace(/\r/g, '').split('\n');
+
+    // usuń pustą linię na końcu
+    if (lines[lines.length - 1] === "") {
+        lines.pop();
+    }
+
+    const headers = parseCSVLine(lines[0]);
+
+    for (let i = 1; i < lines.length; i++) {
+        const values = parseCSVLine(lines[i]);
+        if (values.length === headers.length) {
+            let obj = {};
+            headers.forEach((h, index) => {
+                obj[h.trim()] = values[index];
+            });
+            rows.push(obj);
+        }
+    }
+
+    return rows;
+}
+
+// Funkcja rozbijająca linię CSV z uwzględnieniem cudzysłowów
+function parseCSVLine(line) {
+    const result = [];
+    let current = "";
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+
+        if (char === '"') {
+            inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+            result.push(current);
+            current = "";
+        } else {
+            current += char;
+        }
+    }
+    result.push(current);
+
+    return result.map(v => v.replace(/^"|"$/g, '').trim());
+}
+
+// Wczytywanie pliku
 document.getElementById("fileInput").addEventListener("change", function(e) {
     const file = e.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
+
     reader.onload = function(event) {
         const text = event.target.result;
-        parseCSV(text);
-        alert("Plik wczytany poprawnie!");
+        csvData = parseCSV(text);
+
+        document.getElementById("status").innerHTML =
+            "<b>Plik wczytany! Liczba rekordów: " + csvData.length + "</b>";
+
+        // Pokaż dane od razu (żeby było widać że działa)
+        displayTable(csvData, false);
+        console.log(csvData);
     };
+
+    // WAŻNE: UTF-8 dla polskich znaków
     reader.readAsText(file, "UTF-8");
 });
 
-// Parser CSV (obsługuje
+// Sortowanie po ID
+function groupByID() {
+    if (csvData.length === 0) {
+        alert("Najpierw wczytaj plik CSV!");
+        return;
+    }
+
+    const sorted = [...csvData].sort((a, b) =>
+        Number(a.customer_id) - Number(b.customer_id)
+    );
+
+    displayTable(sorted, false);
+}
+
+// Sumowanie netto dla tych samych klientów
+function sumByCustomer() {
+    if (csvData.length === 0) {
+        alert("Najpierw wczytaj plik CSV!");
+        return;
+    }
+
+    const map = {};
+
+    csvData.forEach(row => {
+        const id = row.customer_id;
+        const klient = row.klient;
+        const netto = parseFloat(row.netto) || 0;
+
+        if (!map[id]) {
+            map[id] = {
+                customer_id: id,
+                klient: klient,
+                suma_netto: 0
+            };
+        }
+
+        map[id].suma_netto += netto;
+    });
+
+    const result = Object.values(map).sort((a, b) =>
+        Number(a.customer_id) - Number(b.customer_id)
+    );
+
+    displaySummaryTable(result);
+}
+
+// Wyświetlanie pełnej tabeli
+function displayTable(data) {
+    let html = `
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>Klient</th>
+            <th>Nazwa taryfy</th>
+            <th>Typ taryfy</th>
+            <th>Data</th>
+            <th>Netto</th>
+            <th>Brutto</th>
+        </tr>`;
+
+    data.forEach(row => {
+        html += `
+        <tr>
+            <td>${row.customer_id}</td>
+            <td>${row.klient}</td>
+            <td>${row.nazwa_taryfy}</td>
+            <td>${row.typ_taryfy}</td>
+            <td>${row.dataod}</td>
+            <td>${row.netto}</td>
+            <td>${row.brutto}</td>
+        </tr>`;
+    });
+
+    html += "</table>";
+    document.getElementById("output").innerHTML = html;
+}
+
+// Tabela podsumowania
+function displaySummaryTable(data) {
+    let html = `
+    <table>
+        <tr>
+            <th>ID Klienta</th>
+            <th>Klient</th>
+            <th>Suma Netto</th>
+        </tr>`;
+
+    data.forEach(row => {
+        html += `
+        <tr>
+            <td>${row.customer_id}</td>
+            <td>${row.klient}</td>
+            <td>${row.suma_netto.toFixed(2)}</td>
+        </tr>`;
+    });
+
+    html += "</table>";
+    document.getElementById("output").innerHTML = html;
+}
+</script>
+
+</body>
+</html>
