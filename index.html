@@ -4,21 +4,75 @@
 <meta charset="UTF-8">
 <title>Analiza CSV klientów</title>
 <style>
-body { font-family: Arial; margin: 20px; }
-button { padding: 10px; margin: 5px; cursor: pointer; }
-table { border-collapse: collapse; margin-top: 20px; width: 100%; }
-th, td { border: 1px solid #ccc; padding: 8px; }
-th { background: #f0f0f0; }
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background: #f5f7fa;
+}
+
+h2 {
+    margin-bottom: 10px;
+}
+
+button {
+    padding: 10px 15px;
+    margin: 5px 5px 15px 0;
+    cursor: pointer;
+    border: none;
+    background: #2c7be5;
+    color: white;
+    border-radius: 6px;
+}
+
+button:hover {
+    background: #1a68d1;
+}
+
+input[type="file"] {
+    margin-bottom: 10px;
+}
+
+#status {
+    margin: 10px 0;
+    font-weight: bold;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    background: white;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    font-size: 14px;
+}
+
+th {
+    background: #eef2f7;
+    text-align: left;
+}
+
+tr:nth-child(even) {
+    background: #fafafa;
+}
+
+.total-row {
+    font-weight: bold;
+    background: #e6f0ff;
+}
 </style>
 </head>
 <body>
 
-<h2>Wczytaj plik CSV</h2>
+<h2>Wczytaj plik CSV klientów</h2>
 
 <input type="file" id="fileInput" accept=".csv">
 <br>
 <button onclick="groupByID()">Grupuj po ID</button>
-<button onclick="sumByCustomer()">Sumuj wartości klientów (netto)</button>
+<button onclick="sumByCustomer()">Sumuj wartości klientów (NETTO + BRUTTO)</button>
 
 <div id="status"></div>
 <div id="output"></div>
@@ -26,24 +80,29 @@ th { background: #f0f0f0; }
 <script>
 let csvData = [];
 
-// POPRAWNY parser CSV (obsługa cudzysłowów)
+// ====== Parser CSV (obsługa cudzysłowów i przecinków) ======
 function parseCSV(text) {
     const rows = [];
     const lines = text.replace(/\r/g, '').split('\n');
 
+    if (lines.length === 0) return rows;
+
     // usuń pustą linię na końcu
-    if (lines[lines.length - 1] === "") {
+    if (lines[lines.length - 1].trim() === "") {
         lines.pop();
     }
 
     const headers = parseCSVLine(lines[0]);
 
     for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+
         const values = parseCSVLine(lines[i]);
+
         if (values.length === headers.length) {
             let obj = {};
-            headers.forEach((h, index) => {
-                obj[h.trim()] = values[index];
+            headers.forEach((header, index) => {
+                obj[header.trim()] = values[index];
             });
             rows.push(obj);
         }
@@ -52,7 +111,7 @@ function parseCSV(text) {
     return rows;
 }
 
-// Funkcja rozbijająca linię CSV z uwzględnieniem cudzysłowów
+// ====== Rozbijanie linii CSV z uwzględnieniem cudzysłowów ======
 function parseCSVLine(line) {
     const result = [];
     let current = "";
@@ -75,7 +134,7 @@ function parseCSVLine(line) {
     return result.map(v => v.replace(/^"|"$/g, '').trim());
 }
 
-// Wczytywanie pliku
+// ====== Wczytywanie pliku CSV ======
 document.getElementById("fileInput").addEventListener("change", function(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -87,18 +146,18 @@ document.getElementById("fileInput").addEventListener("change", function(e) {
         csvData = parseCSV(text);
 
         document.getElementById("status").innerHTML =
-            "<b>Plik wczytany! Liczba rekordów: " + csvData.length + "</b>";
+            "Plik wczytany poprawnie. Liczba rekordów: " + csvData.length;
 
-        // Pokaż dane od razu (żeby było widać że działa)
-        displayTable(csvData, false);
-        console.log(csvData);
+        // Wyświetl dane od razu
+        displayFullTable(csvData);
+        console.log("Wczytane dane:", csvData);
     };
 
-    // WAŻNE: UTF-8 dla polskich znaków
+    // Ważne dla polskich znaków
     reader.readAsText(file, "UTF-8");
 });
 
-// Sortowanie po ID
+// ====== Sortowanie po ID klienta ======
 function groupByID() {
     if (csvData.length === 0) {
         alert("Najpierw wczytaj plik CSV!");
@@ -109,9 +168,10 @@ function groupByID() {
         Number(a.customer_id) - Number(b.customer_id)
     );
 
-    displayTable(sorted, false);
+    displayFullTable(sorted);
 }
-// Sumowanie BRUTTO dla tych samych klientów + dodatkowe kolumny
+
+// ====== Sumowanie po kliencie (NETTO + BRUTTO + data + taryfa) ======
 function sumByCustomer() {
     if (csvData.length === 0) {
         alert("Najpierw wczytaj plik CSV!");
@@ -122,6 +182,7 @@ function sumByCustomer() {
 
     csvData.forEach(row => {
         const id = row.customer_id;
+        const netto = parseFloat(row.netto) || 0;
         const brutto = parseFloat(row.brutto) || 0;
 
         if (!map[id]) {
@@ -131,10 +192,12 @@ function sumByCustomer() {
                 nazwa_taryfy: row.nazwa_taryfy,
                 typ_taryfy: row.typ_taryfy,
                 dataod: row.dataod,
+                suma_netto: 0,
                 suma_brutto: 0
             };
         }
 
+        map[id].suma_netto += netto;
         map[id].suma_brutto += brutto;
     });
 
@@ -145,17 +208,18 @@ function sumByCustomer() {
     displaySummaryTable(result);
 }
 
-// Tabela podsumowania (BRUTTO + pełne dane klienta)
-function displaySummaryTable(data) {
+// ====== Tabela pełnych danych ======
+function displayFullTable(data) {
     let html = `
     <table>
         <tr>
-            <th>ID Klienta</th>
+            <th>ID</th>
             <th>Klient</th>
             <th>Nazwa taryfy</th>
             <th>Typ taryfy</th>
             <th>Data od</th>
-            <th>Suma Brutto</th>
+            <th>Netto</th>
+            <th>Brutto</th>
         </tr>`;
 
     data.forEach(row => {
@@ -166,7 +230,8 @@ function displaySummaryTable(data) {
             <td>${row.nazwa_taryfy}</td>
             <td>${row.typ_taryfy}</td>
             <td>${row.dataod}</td>
-            <td>${row.suma_brutto.toFixed(2)}</td>
+            <td>${row.netto}</td>
+            <td>${row.brutto}</td>
         </tr>`;
     });
 
@@ -174,7 +239,49 @@ function displaySummaryTable(data) {
     document.getElementById("output").innerHTML = html;
 }
 
+// ====== Tabela podsumowania księgowego + GRAND TOTAL ======
+function displaySummaryTable(data) {
+    let totalNetto = 0;
+    let totalBrutto = 0;
 
+    let html = `
+    <table>
+        <tr>
+            <th>ID Klienta</th>
+            <th>Klient</th>
+            <th>Nazwa taryfy</th>
+            <th>Typ taryfy</th>
+            <th>Data od</th>
+            <th>Suma Netto</th>
+            <th>Suma Brutto</th>
+        </tr>`;
+
+    data.forEach(row => {
+        totalNetto += row.suma_netto;
+        totalBrutto += row.suma_brutto;
+
+        html += `
+        <tr>
+            <td>${row.customer_id}</td>
+            <td>${row.klient}</td>
+            <td>${row.nazwa_taryfy}</td>
+            <td>${row.typ_taryfy}</td>
+            <td>${row.dataod}</td>
+            <td>${row.suma_netto.toFixed(2)}</td>
+            <td>${row.suma_brutto.toFixed(2)}</td>
+        </tr>`;
+    });
+
+    html += `
+        <tr class="total-row">
+            <td colspan="5">ŁĄCZNA SUMA WSZYSTKICH KLIENTÓW</td>
+            <td>${totalNetto.toFixed(2)}</td>
+            <td>${totalBrutto.toFixed(2)}</td>
+        </tr>
+    </table>`;
+
+    document.getElementById("output").innerHTML = html;
+}
 </script>
 
 </body>
