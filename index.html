@@ -189,24 +189,38 @@ function sumByCustomer() {
             map[id] = {
                 customer_id: id,
                 klient: row.klient,
-                nazwa_taryfy: row.nazwa_taryfy,
-                typ_taryfy: row.typ_taryfy,
-                dataod: row.dataod,
+                nazwy_taryf: new Set(),
+                typy_taryf: new Set(),
+                daty: new Set(),
                 suma_netto: 0,
                 suma_brutto: 0
             };
         }
 
+        // Dodaj wszystkie taryfy i typy (bez duplikatów)
+        map[id].nazwy_taryf.add(row.nazwa_taryfy);
+        map[id].typy_taryf.add(row.typ_taryfy);
+        map[id].daty.add(row.dataod);
+
         map[id].suma_netto += netto;
         map[id].suma_brutto += brutto;
     });
 
-    const result = Object.values(map).sort((a, b) =>
+    const result = Object.values(map).map(item => ({
+        customer_id: item.customer_id,
+        klient: item.klient,
+        nazwy_taryf: Array.from(item.nazwy_taryf).join(", "),
+        typy_taryf: Array.from(item.typy_taryf).join(", "),
+        daty: Array.from(item.daty).join(", "),
+        suma_netto: item.suma_netto,
+        suma_brutto: item.suma_brutto
+    })).sort((a, b) =>
         Number(a.customer_id) - Number(b.customer_id)
     );
 
     displaySummaryTable(result);
 }
+
 
 // ====== Tabela pełnych danych ======
 function displayFullTable(data) {
@@ -249,9 +263,9 @@ function displaySummaryTable(data) {
         <tr>
             <th>ID Klienta</th>
             <th>Klient</th>
-            <th>Nazwa taryfy</th>
-            <th>Typ taryfy</th>
-            <th>Data od</th>
+            <th>Wszystkie nazwy taryf</th>
+            <th>Wszystkie typy taryf</th>
+            <th>Wszystkie daty od</th>
             <th>Suma Netto</th>
             <th>Suma Brutto</th>
         </tr>`;
@@ -264,13 +278,25 @@ function displaySummaryTable(data) {
         <tr>
             <td>${row.customer_id}</td>
             <td>${row.klient}</td>
-            <td>${row.nazwa_taryfy}</td>
-            <td>${row.typ_taryfy}</td>
-            <td>${row.dataod}</td>
+            <td>${row.nazwy_taryf}</td>
+            <td>${row.typy_taryf}</td>
+            <td>${row.daty}</td>
             <td>${row.suma_netto.toFixed(2)}</td>
             <td>${row.suma_brutto.toFixed(2)}</td>
         </tr>`;
     });
+
+    html += `
+        <tr class="total-row">
+            <td colspan="5">ŁĄCZNA SUMA WSZYSTKICH KLIENTÓW</td>
+            <td>${totalNetto.toFixed(2)}</td>
+            <td>${totalBrutto.toFixed(2)}</td>
+        </tr>
+    </table>`;
+
+    document.getElementById("output").innerHTML = html;
+}
+
 
     html += `
         <tr class="total-row">
