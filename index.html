@@ -111,8 +111,7 @@ function groupByID() {
 
     displayTable(sorted, false);
 }
-
-// Sumowanie netto dla tych samych klientów
+// Sumowanie BRUTTO dla tych samych klientów + dodatkowe kolumny
 function sumByCustomer() {
     if (csvData.length === 0) {
         alert("Najpierw wczytaj plik CSV!");
@@ -123,18 +122,20 @@ function sumByCustomer() {
 
     csvData.forEach(row => {
         const id = row.customer_id;
-        const klient = row.klient;
-        const netto = parseFloat(row.netto) || 0;
+        const brutto = parseFloat(row.brutto) || 0;
 
         if (!map[id]) {
             map[id] = {
                 customer_id: id,
-                klient: klient,
-                suma_netto: 0
+                klient: row.klient,
+                nazwa_taryfy: row.nazwa_taryfy,
+                typ_taryfy: row.typ_taryfy,
+                dataod: row.dataod,
+                suma_brutto: 0
             };
         }
 
-        map[id].suma_netto += netto;
+        map[id].suma_brutto += brutto;
     });
 
     const result = Object.values(map).sort((a, b) =>
@@ -144,18 +145,17 @@ function sumByCustomer() {
     displaySummaryTable(result);
 }
 
-// Wyświetlanie pełnej tabeli
-function displayTable(data) {
+// Tabela podsumowania (BRUTTO + pełne dane klienta)
+function displaySummaryTable(data) {
     let html = `
     <table>
         <tr>
-            <th>ID</th>
+            <th>ID Klienta</th>
             <th>Klient</th>
             <th>Nazwa taryfy</th>
             <th>Typ taryfy</th>
-            <th>Data</th>
-            <th>Netto</th>
-            <th>Brutto</th>
+            <th>Data od</th>
+            <th>Suma Brutto</th>
         </tr>`;
 
     data.forEach(row => {
@@ -166,8 +166,7 @@ function displayTable(data) {
             <td>${row.nazwa_taryfy}</td>
             <td>${row.typ_taryfy}</td>
             <td>${row.dataod}</td>
-            <td>${row.netto}</td>
-            <td>${row.brutto}</td>
+            <td>${row.suma_brutto.toFixed(2)}</td>
         </tr>`;
     });
 
@@ -175,28 +174,7 @@ function displayTable(data) {
     document.getElementById("output").innerHTML = html;
 }
 
-// Tabela podsumowania
-function displaySummaryTable(data) {
-    let html = `
-    <table>
-        <tr>
-            <th>ID Klienta</th>
-            <th>Klient</th>
-            <th>Suma Netto</th>
-        </tr>`;
 
-    data.forEach(row => {
-        html += `
-        <tr>
-            <td>${row.customer_id}</td>
-            <td>${row.klient}</td>
-            <td>${row.suma_netto.toFixed(2)}</td>
-        </tr>`;
-    });
-
-    html += "</table>";
-    document.getElementById("output").innerHTML = html;
-}
 </script>
 
 </body>
