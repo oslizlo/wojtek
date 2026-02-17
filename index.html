@@ -2,53 +2,50 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<title>Analiza klientów CSV + Wykres</title>
-
-<!-- Biblioteka do wykresów -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
+<title>Grupowanie klientów po ID z CSV</title>
 <style>
     body { font-family: Arial; padding: 20px; }
-    button { margin-top: 10px; margin-right: 10px; padding: 8px 16px; cursor: pointer; }
-    ul { margin-top: 20px; }
-    li { margin-bottom: 5px; }
+    button { margin: 10px 10px 10px 0; padding: 8px 16px; cursor: pointer; }
+    table { border-collapse: collapse; margin-top: 20px; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background-color: #f2f2f2; }
     #status { margin-top: 15px; font-weight: bold; }
-    #podsumowanie { margin-top: 20px; font-size: 18px; font-weight: bold; color: green; }
-    #chartContainer { margin-top: 30px; max-width: 700px; }
 </style>
 </head>
 <body>
 
-<h2>Analiza klientów z pliku CSV</h2>
+<h2>Analiza CSV klientów (grupowanie po ID)</h2>
 
 <input type="file" id="fileInput" accept=".csv">
 <br>
-<button id="sortBtn">Sortuj alfabetycznie</button>
-<button id="sumBtn">Sumuj wartość</button>
-<button id="chartBtn">Rysuj wykres kołowy</button>
+<button id="groupBtn">Grupuj i sortuj po ID</button>
+<button id="sumBtn">Sumuj wartości tych samych klientów</button>
 
 <div id="status">Status: Nie wczytano pliku</div>
-<ul id="lista"></ul>
-<div id="podsumowanie"></div>
-
-<div id="chartContainer">
-    <canvas id="pieChart"></canvas>
-</div>
+<table id="tabela">
+    <thead>
+        <tr>
+            <th>Customer ID</th>
+            <th>Klient</th>
+            <th>Liczba rekordów</th>
+            <th>Suma Netto</th>
+            <th>Suma Brutto</th>
+        </tr>
+    </thead>
+    <tbody></tbody>
+</table>
 
 <script>
-let klienci = [];
-let chart = null;
+let daneCSV = [];
+let grupyKlientow = {};
 
 const fileInput = document.getElementById("fileInput");
-const sortBtn = document.getElementById("sortBtn");
+const groupBtn = document.getElementById("groupBtn");
 const sumBtn = document.getElementById("sumBtn");
-const chartBtn = document.getElementById("chartBtn");
-const lista = document.getElementById("lista");
 const statusDiv = document.getElementById("status");
-const podsumowanieDiv = document.getElementById("podsumowanie");
-const ctx = document.getElementById("pieChart").getContext("2d");
+const tabelaBody = document.querySelector("#tabela tbody");
 
-// Wczytywanie pliku CSV
+// 1. Wczytywanie pliku CSV
 fileInput.addEventListener("change", function(event) {
     const file = event.target.files[0];
 
@@ -62,151 +59,93 @@ fileInput.addEventListener("change", function(event) {
 
     reader.onload = function(e) {
         const text = e.target.result;
-        klienci = parseCSV(text);
-        lista.innerHTML = "";
-        podsumowanieDiv.textContent = "";
+        daneCSV = parseCSV(text);
+        grupyKlientow = {};
+        tabelaBody.innerHTML = "";
 
-        if (chart) {
-            chart.destroy();
-        }
-
-        if (klienci.length === 0) {
-            statusDiv.textContent = "Status: Nie znaleziono danych w CSV.";
+        if (daneCSV.length === 0) {
+            statusDiv.textContent = "Status: Brak danych w pliku CSV.";
         } else {
-            statusDiv.textContent = `Status: Wczytano ${klienci.length} klientów.`;
+            statusDiv.textContent = `Status: Wczytano ${daneCSV.length} rekordów.`;
         }
     };
 
     reader.readAsText(file, "UTF-8");
 });
 
-// Sortowanie alfabetyczne
-sortBtn.addEventListener("click", function() {
-    if (klienci.length === 0) {
+// 2. Grupowanie i sortowanie po customer_id (po kliknięciu)
+groupBtn.addEventListener("click", function() {
+    if (daneCSV.length === 0) {
         statusDiv.textContent = "Status: Najpierw wczytaj plik CSV!";
         return;
     }
 
-    const posortowani = [...klienci].sort((a, b) =>
-        a.nazwa.localeCompare(b.nazwa, 'pl', { sensitivity: 'base' })
-    );
+    grupyKlientow = {};
 
-    wyswietlListe(posortowani);
-    statusDiv.textContent = "Status: Lista klientów posortowana alfabetycznie.";
+    daneCSV.forEach(wiersz => {
+        const id = wiersz.customer_id;
+
+        if (!grupyKlientow[id]) {
+            grupyKlientow[id] = {
+                customer_id: id,
+                klient: wiersz.klient,
+                rekordy: 0,
+                sumaNetto: 0,
+                sumaBrutto: 0
+            };
+        }
+
+        grupyKlientow[id].rekordy += 1;
+    });
+
+    // Sortowanie po ID rosnąco
+    const posortowane = Object.values(grupyKlientow)
+        .sort((a, b) => Number(a.customer_id) - Number(b.customer_id));
+
+    wyswietlTabele(posortowane, false);
+    statusDiv.textContent = "Status: Klienci pogrupowani i posortowani po customer_id.";
 });
 
-// Sumowanie wartości
+// 3. Sumowanie wartości tych samych klientów
 sumBtn.addEventListener("click", function() {
-    if (klienci.length === 0) {
+    if (daneCSV.length === 0) {
         statusDiv.textContent = "Status: Najpierw wczytaj plik CSV!";
         return;
     }
 
-    let suma = 0;
-
-    klienci.forEach(klient => {
-        let wartosc = klient.wartosc.replace(",", ".");
-        let liczba = parseFloat(wartosc);
-
-        if (!isNaN(liczba)) {
-            suma += liczba;
-        }
-    });
-
-    podsumowanieDiv.textContent = "Suma wartości wszystkich klientów: " + suma.toFixed(2);
-    statusDiv.textContent = "Status: Obliczono sumę wartości.";
-});
-
-// Rysowanie wykresu kołowego
-chartBtn.addEventListener("click", function() {
-    if (klienci.length === 0) {
-        statusDiv.textContent = "Status: Najpierw wczytaj plik CSV!";
+    if (Object.keys(grupyKlientow).length === 0) {
+        statusDiv.textContent = "Status: Najpierw kliknij 'Grupuj i sortuj po ID'.";
         return;
     }
 
-    const labels = [];
-    const data = [];
+    // Zerowanie sum przed liczeniem
+    Object.values(grupyKlientow).forEach(grupa => {
+        grupa.sumaNetto = 0;
+        grupa.sumaBrutto = 0;
+    });
 
-    klienci.forEach(klient => {
-        let wartosc = klient.wartosc.replace(",", ".");
-        let liczba = parseFloat(wartosc);
+    daneCSV.forEach(wiersz => {
+        const id = wiersz.customer_id;
 
-        if (!isNaN(liczba) && liczba > 0) {
-            labels.push(klient.nazwa);
-            data.push(liczba);
+        let netto = parseFloat((wiersz.netto || "0").replace(",", "."));
+        let brutto = parseFloat((wiersz.brutto || "0").replace(",", "."));
+
+        if (!isNaN(netto)) {
+            grupyKlientow[id].sumaNetto += netto;
+        }
+
+        if (!isNaN(brutto)) {
+            grupyKlientow[id].sumaBrutto += brutto;
         }
     });
 
-    if (data.length === 0) {
-        statusDiv.textContent = "Status: Brak poprawnych wartości do wykresu.";
-        return;
-    }
+    const posortowane = Object.values(grupyKlientow)
+        .sort((a, b) => Number(a.customer_id) - Number(b.customer_id));
 
-    // Usuwanie starego wykresu (żeby nie nakładały się)
-    if (chart) {
-        chart.destroy();
-    }
-
-    chart = new Chart(ctx, {
-        type: 'pie',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Wartość klientów',
-                data: data
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    position: 'right'
-                }
-            }
-        }
-    });
-
-    statusDiv.textContent = "Status: Narysowano wykres kołowy klientów.";
+    wyswietlTabele(posortowane, true);
+    statusDiv.textContent = "Status: Zsumowano wartości netto i brutto dla tych samych klientów.";
 });
 
-// Parser CSV dopasowany do: ; oraz "cudzysłowy"
+// Parser CSV (obsługa przecinków i cudzysłowów)
 function parseCSV(text) {
-    text = text.replace(/^\uFEFF/, "");
-
-    const linie = text.trim().split(/\r?\n/);
-    if (linie.length < 2) return [];
-
-    const separator = ";";
-    const wynik = [];
-
-    for (let i = 1; i < linie.length; i++) {
-        let linia = linie[i].trim();
-        if (!linia) continue;
-
-        let kolumny = linia.split(separator);
-        kolumny = kolumny.map(k => k.replace(/^"|"$/g, "").trim());
-
-        const id = kolumny[0] || "";
-        const nazwa = kolumny[1] || "";
-        const wartosc = kolumny[2] || "0";
-
-        wynik.push({ id, nazwa, wartosc });
-    }
-
-    return wynik;
-}
-
-// Wyświetlanie listy
-function wyswietlListe(listaKlientow) {
-    lista.innerHTML = "";
-
-    listaKlientow.forEach(klient => {
-        const li = document.createElement("li");
-        li.textContent = `ID: ${klient.id} | ${klient.nazwa} | Wartość: ${klient.wartosc}`;
-        lista.appendChild(li);
-    });
-}
-</script>
-
-</body>
-</html>
+    text = text.replace(/^\uFEFF
