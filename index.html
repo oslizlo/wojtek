@@ -2,150 +2,61 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<title>Grupowanie klientów po ID z CSV</title>
+<title>Analiza CSV klientów</title>
 <style>
-    body { font-family: Arial; padding: 20px; }
-    button { margin: 10px 10px 10px 0; padding: 8px 16px; cursor: pointer; }
-    table { border-collapse: collapse; margin-top: 20px; width: 100%; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-    th { background-color: #f2f2f2; }
-    #status { margin-top: 15px; font-weight: bold; }
+    body {
+        font-family: Arial;
+        margin: 20px;
+        background: #f5f5f5;
+    }
+    button {
+        margin: 5px;
+        padding: 10px 15px;
+        cursor: pointer;
+    }
+    table {
+        border-collapse: collapse;
+        margin-top: 20px;
+        width: 100%;
+        background: white;
+    }
+    th, td {
+        border: 1px solid #ccc;
+        padding: 8px;
+        text-align: left;
+    }
+    th {
+        background: #eee;
+    }
 </style>
 </head>
 <body>
 
-<h2>Analiza CSV klientów (grupowanie po ID)</h2>
+<h2>Wczytaj plik CSV klientów</h2>
 
 <input type="file" id="fileInput" accept=".csv">
 <br>
-<button id="groupBtn">Grupuj i sortuj po ID</button>
-<button id="sumBtn">Sumuj wartości tych samych klientów</button>
+<button onclick="groupByID()">Grupuj po ID</button>
+<button onclick="sumByCustomer()">Sumuj wartości klientów</button>
 
-<div id="status">Status: Nie wczytano pliku</div>
-<table id="tabela">
-    <thead>
-        <tr>
-            <th>Customer ID</th>
-            <th>Klient</th>
-            <th>Liczba rekordów</th>
-            <th>Suma Netto</th>
-            <th>Suma Brutto</th>
-        </tr>
-    </thead>
-    <tbody></tbody>
-</table>
+<div id="output"></div>
 
 <script>
-let daneCSV = [];
-let grupyKlientow = {};
+let csvData = [];
+let groupedData = [];
 
-const fileInput = document.getElementById("fileInput");
-const groupBtn = document.getElementById("groupBtn");
-const sumBtn = document.getElementById("sumBtn");
-const statusDiv = document.getElementById("status");
-const tabelaBody = document.querySelector("#tabela tbody");
-
-// 1. Wczytywanie pliku CSV
-fileInput.addEventListener("change", function(event) {
-    const file = event.target.files[0];
-
-    if (!file) {
-        statusDiv.textContent = "Status: Nie wybrano pliku.";
-        return;
-    }
+// Wczytywanie pliku CSV
+document.getElementById("fileInput").addEventListener("change", function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
 
     const reader = new FileReader();
-    statusDiv.textContent = "Status: Wczytywanie pliku CSV...";
-
-    reader.onload = function(e) {
-        const text = e.target.result;
-        daneCSV = parseCSV(text);
-        grupyKlientow = {};
-        tabelaBody.innerHTML = "";
-
-        if (daneCSV.length === 0) {
-            statusDiv.textContent = "Status: Brak danych w pliku CSV.";
-        } else {
-            statusDiv.textContent = `Status: Wczytano ${daneCSV.length} rekordów.`;
-        }
+    reader.onload = function(event) {
+        const text = event.target.result;
+        parseCSV(text);
+        alert("Plik wczytany poprawnie!");
     };
-
     reader.readAsText(file, "UTF-8");
 });
 
-// 2. Grupowanie i sortowanie po customer_id (po kliknięciu)
-groupBtn.addEventListener("click", function() {
-    if (daneCSV.length === 0) {
-        statusDiv.textContent = "Status: Najpierw wczytaj plik CSV!";
-        return;
-    }
-
-    grupyKlientow = {};
-
-    daneCSV.forEach(wiersz => {
-        const id = wiersz.customer_id;
-
-        if (!grupyKlientow[id]) {
-            grupyKlientow[id] = {
-                customer_id: id,
-                klient: wiersz.klient,
-                rekordy: 0,
-                sumaNetto: 0,
-                sumaBrutto: 0
-            };
-        }
-
-        grupyKlientow[id].rekordy += 1;
-    });
-
-    // Sortowanie po ID rosnąco
-    const posortowane = Object.values(grupyKlientow)
-        .sort((a, b) => Number(a.customer_id) - Number(b.customer_id));
-
-    wyswietlTabele(posortowane, false);
-    statusDiv.textContent = "Status: Klienci pogrupowani i posortowani po customer_id.";
-});
-
-// 3. Sumowanie wartości tych samych klientów
-sumBtn.addEventListener("click", function() {
-    if (daneCSV.length === 0) {
-        statusDiv.textContent = "Status: Najpierw wczytaj plik CSV!";
-        return;
-    }
-
-    if (Object.keys(grupyKlientow).length === 0) {
-        statusDiv.textContent = "Status: Najpierw kliknij 'Grupuj i sortuj po ID'.";
-        return;
-    }
-
-    // Zerowanie sum przed liczeniem
-    Object.values(grupyKlientow).forEach(grupa => {
-        grupa.sumaNetto = 0;
-        grupa.sumaBrutto = 0;
-    });
-
-    daneCSV.forEach(wiersz => {
-        const id = wiersz.customer_id;
-
-        let netto = parseFloat((wiersz.netto || "0").replace(",", "."));
-        let brutto = parseFloat((wiersz.brutto || "0").replace(",", "."));
-
-        if (!isNaN(netto)) {
-            grupyKlientow[id].sumaNetto += netto;
-        }
-
-        if (!isNaN(brutto)) {
-            grupyKlientow[id].sumaBrutto += brutto;
-        }
-    });
-
-    const posortowane = Object.values(grupyKlientow)
-        .sort((a, b) => Number(a.customer_id) - Number(b.customer_id));
-
-    wyswietlTabele(posortowane, true);
-    statusDiv.textContent = "Status: Zsumowano wartości netto i brutto dla tych samych klientów.";
-});
-
-// Parser CSV (obsługa przecinków i cudzysłowów)
-function parseCSV(text) {
-    text = text.replace(/^\uFEFF
+// Parser CSV (obsługuje
