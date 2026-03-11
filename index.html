@@ -2,233 +2,174 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<title>Analiza CSV klientów</title>
+<title>Łączenie CSV</title>
 <style>
-body { font-family: Arial; margin: 20px; background: #f5f7fa; }
-button { padding: 10px 15px; margin: 5px; cursor: pointer; }
-table { border-collapse: collapse; width: 100%; background: white; margin-top: 20px; }
-th, td { border: 1px solid #ddd; padding: 8px; font-size: 14px; vertical-align: top; }
-th { background: #eef2f7; }
-.total-row { font-weight: bold; background: #e6f0ff; }
+body{
+    font-family: Arial;
+    padding:40px;
+}
+button{
+    padding:10px 20px;
+    margin:10px;
+}
+table{
+    border-collapse:collapse;
+    margin-top:20px;
+}
+td,th{
+    border:1px solid #ccc;
+    padding:6px 10px;
+}
 </style>
 </head>
+
 <body>
 
-<h2>Wczytaj plik CSV klientów</h2>
+<h2>Łączenie danych z CSV</h2>
 
-<input type="file" id="fileInput" accept=".csv">
-<br>
-<button onclick="groupByID()">Grupuj po ID</button>
-<button onclick="sumByCustomer()">Sumuj wartości klientów (pełne taryfy)</button>
+<div>
+<label>Plik 1 (ID, nazwa, grupa)</label><br>
+<input type="file" id="file1" accept=".csv">
+</div>
 
-<div id="status"></div>
-<div id="output"></div>
+<div>
+<label>Plik 2 (cus.id, MAC, Serial)</label><br>
+<input type="file" id="file2" accept=".csv">
+</div>
+
+<button onclick="mergeData()">Połącz dane</button>
+<button onclick="downloadCSV()">Pobierz wynik CSV</button>
+
+<table id="resultTable">
+<thead>
+<tr>
+<th>ID</th>
+<th>Nazwa</th>
+<th>Grupa</th>
+<th>MAC</th>
+<th>Serial</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
 
 <script>
-let csvData = [];
 
-// ===== BARDZO ODPORNY PARSER CSV (Excel + cudzysłowy) =====
-function parseCSV(text) {
-    const lines = text.replace(/\r/g, '').split('\n').filter(l => l.trim() !== '');
-    const headers = smartSplit(lines[0]);
+let csv1 = []
+let csv2 = []
+let merged = []
 
-    const data = [];
+function parseCSV(text){
+    const rows = text.split(/\r?\n/).filter(r=>r.trim()!="")
+    const headers = rows[0].split(",")
 
-    for (let i = 1; i < lines.length; i++) {
-        const rowValues = smartSplit(lines[i]);
-        if (rowValues.length < headers.length) continue;
+    return rows.slice(1).map(row=>{
+        const values = row.split(",")
+        let obj = {}
 
-        let obj = {};
-        headers.forEach((h, index) => {
-            obj[h.trim()] = (rowValues[index] || "").replace(/^"|"$/g, '').trim();
-        });
+        headers.forEach((h,i)=>{
+            obj[h.trim()] = values[i] ? values[i].trim() : ""
+        })
 
-        data.push(obj);
+        return obj
+    })
+}
+
+document.getElementById("file1").addEventListener("change",function(e){
+    const reader = new FileReader()
+
+    reader.onload = function(event){
+        csv1 = parseCSV(event.target.result)
     }
 
-    return data;
-}
+    reader.readAsText(e.target.files[0])
+})
 
-// Rozdzielanie linii CSV z obsługą cudzysłowów
-function smartSplit(line) {
-    const result = [];
-    let current = "";
-    let inQuotes = false;
+document.getElementById("file2").addEventListener("change",function(e){
+    const reader = new FileReader()
 
-    for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-
-        if (char === '"') {
-            inQuotes = !inQuotes;
-        } else if (char === ',' && !inQuotes) {
-            result.push(current);
-            current = "";
-        } else {
-            current += char;
-        }
-    }
-    result.push(current);
-    return result;
-}
-
-// ===== Wczytywanie pliku =====
-document.getElementById("fileInput").addEventListener("change", function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function(event) {
-        const text = event.target.result;
-        csvData = parseCSV(text);
-
-        document.getElementById("status").innerHTML =
-            "<b>Wczytano rekordów: " + csvData.length + "</b>";
-
-        displayFullTable(csvData);
-        console.log(csvData);
-    };
-
-    reader.readAsText(file, "UTF-8");
-});
-
-// ===== Sortowanie po ID =====
-function groupByID() {
-    if (csvData.length === 0) {
-        alert("Najpierw wczytaj plik CSV!");
-        return;
+    reader.onload = function(event){
+        csv2 = parseCSV(event.target.result)
     }
 
-    const sorted = [...csvData].sort((a, b) =>
-        Number(a.customer_id) - Number(b.customer_id)
-    );
+    reader.readAsText(e.target.files[0])
+})
 
-    displayFullTable(sorted);
-}
+function mergeData(){
 
-// ===== KLUCZOWA FUNKCJA – WSZYSTKIE TARYFY I TYPY =====
-function sumByCustomer() {
-    if (csvData.length === 0) {
-        alert("Najpierw wczytaj plik CSV!");
-        return;
-    }
+    merged = []
 
-    const map = {};
+    const map = {}
 
-    csvData.forEach(row => {
-        const id = row.customer_id;
-        const netto = parseFloat(row.netto) || 0;
-        const brutto = parseFloat(row.brutto) || 0;
+    csv2.forEach(r=>{
+        map[r["cus.id"]] = {
+            mac: r["MAC"],
+            serial: r["Serial"]
+        }
+    })
 
-        if (!map[id]) {
-            map[id] = {
-                customer_id: id,
-                klient: row.klient,
-                taryfy: [],
-                typy: [],
-                daty: [],
-                suma_netto: 0,
-                suma_brutto: 0
-            };
+    csv1.forEach(r=>{
+
+        const id = r["id"]
+
+        if(map[id]){
+
+            merged.push({
+                id: id,
+                nazwa: r["nazwa"],
+                grupa: r["grupa"],
+                mac: map[id].mac,
+                serial: map[id].serial
+            })
+
         }
 
-        // DODAJEMY WSZYSTKIE (bez nadpisywania!)
-        if (row.nazwa_taryfy && !map[id].taryfy.includes(row.nazwa_taryfy)) {
-            map[id].taryfy.push(row.nazwa_taryfy);
-        }
+    })
 
-        if (row.typ_taryfy && !map[id].typy.includes(row.typ_taryfy)) {
-            map[id].typy.push(row.typ_taryfy);
-        }
-
-        if (row.dataod && !map[id].daty.includes(row.dataod)) {
-            map[id].daty.push(row.dataod);
-        }
-
-        map[id].suma_netto += netto;
-        map[id].suma_brutto += brutto;
-    });
-
-    const result = Object.values(map).sort((a, b) =>
-        Number(a.customer_id) - Number(b.customer_id)
-    );
-
-    displaySummaryTable(result);
+    showTable()
 }
 
-// ===== Tabela pełna =====
-function displayFullTable(data) {
-    let html = `
-    <table>
-        <tr>
-            <th>ID</th>
-            <th>Klient</th>
-            <th>Nazwa taryfy</th>
-            <th>Typ taryfy</th>
-            <th>Data od</th>
-            <th>Netto</th>
-            <th>Brutto</th>
-        </tr>`;
+function showTable(){
 
-    data.forEach(row => {
-        html += `
-        <tr>
-            <td>${row.customer_id}</td>
-            <td>${row.klient}</td>
-            <td>${row.nazwa_taryfy}</td>
-            <td>${row.typ_taryfy}</td>
-            <td>${row.dataod}</td>
-            <td>${row.netto}</td>
-            <td>${row.brutto}</td>
-        </tr>`;
-    });
+    const tbody = document.querySelector("#resultTable tbody")
+    tbody.innerHTML=""
 
-    html += "</table>";
-    document.getElementById("output").innerHTML = html;
+    merged.forEach(r=>{
+
+        const tr = document.createElement("tr")
+
+        tr.innerHTML = `
+        <td>${r.id}</td>
+        <td>${r.nazwa}</td>
+        <td>${r.grupa}</td>
+        <td>${r.mac}</td>
+        <td>${r.serial}</td>
+        `
+
+        tbody.appendChild(tr)
+
+    })
+
 }
 
-// ===== Tabela podsumowania (WSZYSTKIE taryfy i typy) =====
-function displaySummaryTable(data) {
-    let totalNetto = 0;
-    let totalBrutto = 0;
+function downloadCSV(){
 
-    let html = `
-    <table>
-        <tr>
-            <th>ID Klienta</th>
-            <th>Klient</th>
-            <th>Wszystkie nazwy taryf</th>
-            <th>Wszystkie typy taryf</th>
-            <th>Wszystkie daty od</th>
-            <th>Suma Netto</th>
-            <th>Suma Brutto</th>
-        </tr>`;
+    let csv = "ID,Nazwa,Grupa,MAC,Serial\n"
 
-    data.forEach(row => {
-        totalNetto += row.suma_netto;
-        totalBrutto += row.suma_brutto;
+    merged.forEach(r=>{
+        csv += `${r.id},${r.nazwa},${r.grupa},${r.mac},${r.serial}\n`
+    })
 
-        html += `
-        <tr>
-            <td>${row.customer_id}</td>
-            <td>${row.klient}</td>
-            <td>${row.taryfy.join("<br>")}</td>
-            <td>${row.typy.join("<br>")}</td>
-            <td>${row.daty.join("<br>")}</td>
-            <td>${row.suma_netto.toFixed(2)}</td>
-            <td>${row.suma_brutto.toFixed(2)}</td>
-        </tr>`;
-    });
+    const blob = new Blob([csv],{type:"text/csv"})
+    const url = URL.createObjectURL(blob)
 
-    html += `
-        <tr class="total-row">
-            <td colspan="5">ŁĄCZNA SUMA WSZYSTKICH KLIENTÓW</td>
-            <td>${totalNetto.toFixed(2)}</td>
-            <td>${totalBrutto.toFixed(2)}</td>
-        </tr>
-    </table>`;
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "wynik.csv"
+    a.click()
 
-    document.getElementById("output").innerHTML = html;
 }
+
 </script>
 
 </body>
