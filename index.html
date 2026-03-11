@@ -3,42 +3,32 @@
 <head>
 <meta charset="UTF-8">
 <title>Łączenie CSV</title>
+
 <style>
-body{
-    font-family: Arial;
-    padding:40px;
-}
-button{
-    padding:10px 20px;
-    margin:10px;
-}
-table{
-    border-collapse:collapse;
-    margin-top:20px;
-}
-td,th{
-    border:1px solid #ccc;
-    padding:6px 10px;
-}
+body{font-family:Arial;padding:40px}
+button{padding:10px 20px;margin:10px}
+table{border-collapse:collapse;margin-top:20px}
+td,th{border:1px solid #ccc;padding:6px 10px}
 </style>
 </head>
 
 <body>
 
-<h2>Łączenie danych z CSV</h2>
+<h2>Łączenie CSV</h2>
 
 <div>
-<label>Plik 1 (ID, nazwa, grupa)</label><br>
+Plik 1 (ID, nazwa, grupa)<br>
 <input type="file" id="file1" accept=".csv">
 </div>
 
 <div>
-<label>Plik 2 (cus.id, MAC, Serial)</label><br>
+Plik 2 (cus.id, MAC, Serial)<br>
 <input type="file" id="file2" accept=".csv">
 </div>
 
+<br>
 <button onclick="mergeData()">Połącz dane</button>
-<button onclick="downloadCSV()">Pobierz wynik CSV</button>
+<button onclick="downloadCSV()">Pobierz CSV</button>
 
 <table id="resultTable">
 <thead>
@@ -55,118 +45,135 @@ td,th{
 
 <script>
 
-let csv1 = []
-let csv2 = []
-let merged = []
+let csv1=[]
+let csv2=[]
+let merged=[]
+
+function normalizeHeader(h){
+return h.toLowerCase().replace(/"/g,"").trim()
+}
 
 function parseCSV(text){
-    const rows = text.split(/\r?\n/).filter(r=>r.trim()!="")
-    const headers = rows[0].split(",")
 
-    return rows.slice(1).map(row=>{
-        const values = row.split(",")
-        let obj = {}
+let separator = text.includes(";") ? ";" : ","
 
-        headers.forEach((h,i)=>{
-            obj[h.trim()] = values[i] ? values[i].trim() : ""
-        })
+let rows = text.split(/\r?\n/).filter(r=>r.trim()!="")
 
-        return obj
-    })
+let headers = rows[0].split(separator).map(normalizeHeader)
+
+return rows.slice(1).map(row=>{
+
+let values=row.split(separator)
+let obj={}
+
+headers.forEach((h,i)=>{
+obj[h]=values[i]?values[i].replace(/"/g,"").trim():""
+})
+
+return obj
+
+})
 }
 
 document.getElementById("file1").addEventListener("change",function(e){
-    const reader = new FileReader()
 
-    reader.onload = function(event){
-        csv1 = parseCSV(event.target.result)
-    }
+let reader=new FileReader()
 
-    reader.readAsText(e.target.files[0])
+reader.onload=function(event){
+csv1=parseCSV(event.target.result)
+console.log("CSV1",csv1)
+}
+
+reader.readAsText(e.target.files[0])
+
 })
 
 document.getElementById("file2").addEventListener("change",function(e){
-    const reader = new FileReader()
 
-    reader.onload = function(event){
-        csv2 = parseCSV(event.target.result)
-    }
+let reader=new FileReader()
 
-    reader.readAsText(e.target.files[0])
+reader.onload=function(event){
+csv2=parseCSV(event.target.result)
+console.log("CSV2",csv2)
+}
+
+reader.readAsText(e.target.files[0])
+
 })
 
 function mergeData(){
 
-    merged = []
+merged=[]
 
-    const map = {}
+let map={}
 
-    csv2.forEach(r=>{
-        map[r["cus.id"]] = {
-            mac: r["MAC"],
-            serial: r["Serial"]
-        }
-    })
+csv2.forEach(r=>{
+map[r["cus.id"]]={
+mac:r["mac"],
+serial:r["serial"]
+}
+})
 
-    csv1.forEach(r=>{
+csv1.forEach(r=>{
 
-        const id = r["id"]
+let id=r["id"]
 
-        if(map[id]){
+if(map[id]){
 
-            merged.push({
-                id: id,
-                nazwa: r["nazwa"],
-                grupa: r["grupa"],
-                mac: map[id].mac,
-                serial: map[id].serial
-            })
+merged.push({
+id:id,
+nazwa:r["nazwa"],
+grupa:r["grupa"],
+mac:map[id].mac,
+serial:map[id].serial
+})
 
-        }
+}
 
-    })
+})
 
-    showTable()
+showTable()
+
 }
 
 function showTable(){
 
-    const tbody = document.querySelector("#resultTable tbody")
-    tbody.innerHTML=""
+let tbody=document.querySelector("#resultTable tbody")
+tbody.innerHTML=""
 
-    merged.forEach(r=>{
+merged.forEach(r=>{
 
-        const tr = document.createElement("tr")
+let tr=document.createElement("tr")
 
-        tr.innerHTML = `
-        <td>${r.id}</td>
-        <td>${r.nazwa}</td>
-        <td>${r.grupa}</td>
-        <td>${r.mac}</td>
-        <td>${r.serial}</td>
-        `
+tr.innerHTML=`
+<td>${r.id}</td>
+<td>${r.nazwa}</td>
+<td>${r.grupa}</td>
+<td>${r.mac}</td>
+<td>${r.serial}</td>
+`
 
-        tbody.appendChild(tr)
+tbody.appendChild(tr)
 
-    })
+})
 
 }
 
 function downloadCSV(){
 
-    let csv = "ID,Nazwa,Grupa,MAC,Serial\n"
+let csv="ID,Nazwa,Grupa,MAC,Serial\n"
 
-    merged.forEach(r=>{
-        csv += `${r.id},${r.nazwa},${r.grupa},${r.mac},${r.serial}\n`
-    })
+merged.forEach(r=>{
+csv+=`${r.id},${r.nazwa},${r.grupa},${r.mac},${r.serial}\n`
+})
 
-    const blob = new Blob([csv],{type:"text/csv"})
-    const url = URL.createObjectURL(blob)
+let blob=new Blob([csv],{type:"text/csv"})
+let url=URL.createObjectURL(blob)
 
-    const a = document.createElement("a")
-    a.href = url
-    a.download = "wynik.csv"
-    a.click()
+let a=document.createElement("a")
+a.href=url
+a.download="wynik.csv"
+a.click()
 
 }
 
