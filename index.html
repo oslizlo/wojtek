@@ -21,15 +21,18 @@ Plik 1 (ID;AdresInst)<br>
 <input type="file" id="file1">
 </div>
 
+<br>
+
 <div>
-Plik 2 (id;Nazwa;Grupa;Cus. ID;MAC;Serial...)<br>
+Plik 2 (...;Cus. ID;...;MAC;Serial)<br>
 <input type="file" id="file2">
 </div>
 
 <br>
 
 <button onclick="mergeData()">Połącz dane</button>
-<button onclick="downloadCSV()">Pobierz CSV</button>
+
+<p id="info"></p>
 
 <table id="resultTable">
 <thead>
@@ -50,23 +53,33 @@ let csv1=[]
 let csv2=[]
 let merged=[]
 
-function normalize(h){
-return h.toLowerCase().replace(/ /g,"").replace(/\./g,"").trim()
+function normalizeHeader(h){
+return h
+.toLowerCase()
+.replace(/"/g,"")
+.replace(/\./g,"")
+.replace(/ /g,"")
+.trim()
+}
+
+function cleanValue(v){
+return v.replace(/"/g,"").trim()
 }
 
 function parseCSV(text){
 
 let rows=text.split(/\r?\n/).filter(r=>r.trim()!="")
 
-let headers=rows[0].split(";").map(normalize)
+let headers=rows[0].split(";").map(normalizeHeader)
 
 return rows.slice(1).map(row=>{
 
 let values=row.split(";")
+
 let obj={}
 
 headers.forEach((h,i)=>{
-obj[h]=values[i]?values[i].trim():""
+obj[h]=values[i]?cleanValue(values[i]):""
 })
 
 return obj
@@ -79,8 +92,9 @@ document.getElementById("file1").addEventListener("change",function(e){
 
 let reader=new FileReader()
 
-reader.onload=function(event){
-csv1=parseCSV(event.target.result)
+reader.onload=function(ev){
+csv1=parseCSV(ev.target.result)
+console.log("plik1",csv1)
 }
 
 reader.readAsText(e.target.files[0])
@@ -91,8 +105,9 @@ document.getElementById("file2").addEventListener("change",function(e){
 
 let reader=new FileReader()
 
-reader.onload=function(event){
-csv2=parseCSV(event.target.result)
+reader.onload=function(ev){
+csv2=parseCSV(ev.target.result)
+console.log("plik2",csv2)
 }
 
 reader.readAsText(e.target.files[0])
@@ -106,12 +121,18 @@ merged=[]
 let map={}
 
 csv2.forEach(r=>{
-map[r["cusid"]]={
+
+let id=r["cusid"]
+
+if(id){
+map[id]={
 nazwa:r["nazwa"],
 grupa:r["grupa"],
 mac:r["mac"],
 serial:r["serial"]
 }
+}
+
 })
 
 csv1.forEach(r=>{
@@ -131,6 +152,9 @@ serial:map[id].serial
 }
 
 })
+
+document.getElementById("info").innerText =
+"Dopasowano rekordów: "+merged.length
 
 showTable()
 
@@ -156,24 +180,6 @@ tr.innerHTML=`
 tbody.appendChild(tr)
 
 })
-
-}
-
-function downloadCSV(){
-
-let csv="ID;Nazwa;Grupa;MAC;Serial\n"
-
-merged.forEach(r=>{
-csv+=`${r.id};${r.nazwa};${r.grupa};${r.mac};${r.serial}\n`
-})
-
-let blob=new Blob([csv],{type:"text/csv"})
-let url=URL.createObjectURL(blob)
-
-let a=document.createElement("a")
-a.href=url
-a.download="wynik.csv"
-a.click()
 
 }
 
