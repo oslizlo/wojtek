@@ -38,6 +38,7 @@ Plik 2 (...;Cus. ID;...;MAC;Serial)<br>
 <table id="resultTable">
 <thead>
 <tr>
+<th>LP</th>
 <th>ID</th>
 <th>AdresInst</th>
 <th>Nazwa</th>
@@ -120,34 +121,23 @@ merged=[]
 
 let map={}
 
+csv1.forEach(r=>{
+map[r["id"]]=r["adresinst"]
+})
+
 csv2.forEach(r=>{
 
 let id=r["cusid"]
-
-if(id){
-map[id]={
-nazwa:r["nazwa"],
-grupa:r["grupa"],
-mac:r["mac"],
-serial:r["serial"]
-}
-}
-
-})
-
-csv1.forEach(r=>{
-
-let id=r["id"]
 
 if(map[id]){
 
 merged.push({
 id:id,
-adresinst:r["adresinst"],
-nazwa:map[id].nazwa,
-grupa:map[id].grupa,
-mac:map[id].mac,
-serial:map[id].serial
+adresinst:map[id],
+nazwa:r["nazwa"],
+grupa:r["grupa"],
+mac:r["mac"],
+serial:r["serial"]
 })
 
 }
@@ -155,7 +145,7 @@ serial:map[id].serial
 })
 
 document.getElementById("info").innerText =
-"Dopasowano rekordów: "+merged.length
+"Liczba urządzeń: "+merged.length
 
 showTable()
 
@@ -166,11 +156,12 @@ function showTable(){
 let tbody=document.querySelector("#resultTable tbody")
 tbody.innerHTML=""
 
-merged.forEach(r=>{
+merged.forEach((r,i)=>{
 
 let tr=document.createElement("tr")
 
 tr.innerHTML=`
+<td>${i+1}</td>
 <td>${r.id}</td>
 <td>${r.adresinst}</td>
 <td>${r.nazwa}</td>
@@ -187,10 +178,10 @@ tbody.appendChild(tr)
 
 function downloadCSV(){
 
-let csv="ID;AdresInst;Nazwa;Grupa;MAC;Serial\n"
+let csv="LP;ID;AdresInst;Nazwa;Grupa;MAC;Serial\n"
 
-merged.forEach(r=>{
-csv+=`${r.id};${r.adresinst};${r.nazwa};${r.grupa};${r.mac};${r.serial}\n`
+merged.forEach((r,i)=>{
+csv+=`${i+1};${r.id};${r.adresinst};${r.nazwa};${r.grupa};${r.mac};${r.serial}\n`
 })
 
 let blob=new Blob([csv],{type:"text/csv"})
