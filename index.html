@@ -17,16 +17,17 @@ td,th{border:1px solid #ccc;padding:6px 10px}
 <h2>Łączenie CSV</h2>
 
 <div>
-Plik 1 (ID, nazwa, grupa)<br>
-<input type="file" id="file1" accept=".csv">
+Plik 1 (ID;AdresInst)<br>
+<input type="file" id="file1">
 </div>
 
 <div>
-Plik 2 (cus.id, MAC, Serial)<br>
-<input type="file" id="file2" accept=".csv">
+Plik 2 (id;Nazwa;Grupa;Cus. ID;MAC;Serial...)<br>
+<input type="file" id="file2">
 </div>
 
 <br>
+
 <button onclick="mergeData()">Połącz dane</button>
 <button onclick="downloadCSV()">Pobierz CSV</button>
 
@@ -49,30 +50,29 @@ let csv1=[]
 let csv2=[]
 let merged=[]
 
-function normalizeHeader(h){
-return h.toLowerCase().replace(/"/g,"").trim()
+function normalize(h){
+return h.toLowerCase().replace(/ /g,"").replace(/\./g,"").trim()
 }
 
 function parseCSV(text){
 
-let separator = text.includes(";") ? ";" : ","
+let rows=text.split(/\r?\n/).filter(r=>r.trim()!="")
 
-let rows = text.split(/\r?\n/).filter(r=>r.trim()!="")
-
-let headers = rows[0].split(separator).map(normalizeHeader)
+let headers=rows[0].split(";").map(normalize)
 
 return rows.slice(1).map(row=>{
 
-let values=row.split(separator)
+let values=row.split(";")
 let obj={}
 
 headers.forEach((h,i)=>{
-obj[h]=values[i]?values[i].replace(/"/g,"").trim():""
+obj[h]=values[i]?values[i].trim():""
 })
 
 return obj
 
 })
+
 }
 
 document.getElementById("file1").addEventListener("change",function(e){
@@ -81,7 +81,6 @@ let reader=new FileReader()
 
 reader.onload=function(event){
 csv1=parseCSV(event.target.result)
-console.log("CSV1",csv1)
 }
 
 reader.readAsText(e.target.files[0])
@@ -94,7 +93,6 @@ let reader=new FileReader()
 
 reader.onload=function(event){
 csv2=parseCSV(event.target.result)
-console.log("CSV2",csv2)
 }
 
 reader.readAsText(e.target.files[0])
@@ -108,7 +106,9 @@ merged=[]
 let map={}
 
 csv2.forEach(r=>{
-map[r["cus.id"]]={
+map[r["cusid"]]={
+nazwa:r["nazwa"],
+grupa:r["grupa"],
 mac:r["mac"],
 serial:r["serial"]
 }
@@ -122,8 +122,8 @@ if(map[id]){
 
 merged.push({
 id:id,
-nazwa:r["nazwa"],
-grupa:r["grupa"],
+nazwa:map[id].nazwa,
+grupa:map[id].grupa,
 mac:map[id].mac,
 serial:map[id].serial
 })
@@ -161,10 +161,10 @@ tbody.appendChild(tr)
 
 function downloadCSV(){
 
-let csv="ID,Nazwa,Grupa,MAC,Serial\n"
+let csv="ID;Nazwa;Grupa;MAC;Serial\n"
 
 merged.forEach(r=>{
-csv+=`${r.id},${r.nazwa},${r.grupa},${r.mac},${r.serial}\n`
+csv+=`${r.id};${r.nazwa};${r.grupa};${r.mac};${r.serial}\n`
 })
 
 let blob=new Blob([csv],{type:"text/csv"})
