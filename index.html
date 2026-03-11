@@ -2,19 +2,79 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<title>Łączenie CSV</title>
+<title>Łączenie urządzeń CSV</title>
+
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <style>
-body{font-family:Arial;padding:40px}
-button{padding:10px 20px;margin:10px}
-table{border-collapse:collapse;margin-top:20px}
-td,th{border:1px solid #ccc;padding:6px 10px}
+
+body{
+font-family:Arial;
+padding:40px;
+background:#f5f5f5;
+}
+
+h2{
+margin-bottom:20px;
+}
+
+.panel{
+background:white;
+padding:20px;
+border-radius:8px;
+box-shadow:0 0 10px rgba(0,0,0,0.1);
+margin-bottom:20px;
+}
+
+button{
+padding:10px 18px;
+margin:5px;
+border:0;
+background:#1976d2;
+color:white;
+border-radius:5px;
+cursor:pointer;
+}
+
+button:hover{
+background:#125ea6;
+}
+
+table{
+border-collapse:collapse;
+width:100%;
+background:white;
+}
+
+th,td{
+border:1px solid #ddd;
+padding:6px 10px;
+font-size:13px;
+}
+
+th{
+background:#1976d2;
+color:white;
+}
+
+tbody tr:nth-child(even){
+background:#f2f2f2;
+}
+
+#info{
+margin-top:10px;
+font-weight:bold;
+}
+
 </style>
 </head>
 
 <body>
 
-<h2>Łączenie CSV</h2>
+<h2>Łączenie urządzeń z CSV</h2>
+
+<div class="panel">
 
 <div>
 Plik 1 (ID;AdresInst)<br>
@@ -24,18 +84,22 @@ Plik 1 (ID;AdresInst)<br>
 <br>
 
 <div>
-Plik 2 (...;Cus. ID;...;MAC;Serial)<br>
+Plik 2 (lista urządzeń)<br>
 <input type="file" id="file2">
 </div>
 
 <br>
 
 <button onclick="mergeData()">Połącz dane</button>
-<button onclick="downloadCSV()">Pobierz CSV</button>
+<button onclick="exportCSV()">Eksport CSV</button>
+<button onclick="exportExcel()">Eksport Excel</button>
 
 <p id="info"></p>
 
+</div>
+
 <table id="resultTable">
+
 <thead>
 <tr>
 <th>LP</th>
@@ -47,7 +111,9 @@ Plik 2 (...;Cus. ID;...;MAC;Serial)<br>
 <th>Serial</th>
 </tr>
 </thead>
+
 <tbody></tbody>
+
 </table>
 
 <script>
@@ -57,61 +123,61 @@ let csv2=[]
 let merged=[]
 
 function normalizeHeader(h){
+
 return h
 .toLowerCase()
-.replace(/"/g,"")
 .replace(/\./g,"")
 .replace(/ /g,"")
 .trim()
+
 }
 
-function cleanValue(v){
-return v.replace(/"/g,"").trim()
-}
+function loadCSV(file,callback){
 
-function parseCSV(text){
+Papa.parse(file,{
+header:true,
+delimiter:";",
+skipEmptyLines:true,
+complete:function(results){
 
-let rows=text.split(/\r?\n/).filter(r=>r.trim()!="")
+let data=results.data
 
-let headers=rows[0].split(";").map(normalizeHeader)
-
-return rows.slice(1).map(row=>{
-
-let values=row.split(";")
+let normalized=data.map(row=>{
 
 let obj={}
 
-headers.forEach((h,i)=>{
-obj[h]=values[i]?cleanValue(values[i]):""
+Object.keys(row).forEach(k=>{
+obj[normalizeHeader(k)]=row[k] ? row[k].toString().trim() : ""
 })
 
 return obj
 
 })
 
+callback(normalized)
+
+}
+})
+
 }
 
 document.getElementById("file1").addEventListener("change",function(e){
 
-let reader=new FileReader()
+loadCSV(e.target.files[0],function(data){
 
-reader.onload=function(ev){
-csv1=parseCSV(ev.target.result)
-}
+csv1=data
 
-reader.readAsText(e.target.files[0])
+})
 
 })
 
 document.getElementById("file2").addEventListener("change",function(e){
 
-let reader=new FileReader()
+loadCSV(e.target.files[0],function(data){
 
-reader.onload=function(ev){
-csv2=parseCSV(ev.target.result)
-}
+csv2=data
 
-reader.readAsText(e.target.files[0])
+})
 
 })
 
@@ -119,21 +185,23 @@ function mergeData(){
 
 merged=[]
 
-let map={}
+let mapAdres={}
 
 csv1.forEach(r=>{
-map[r["id"]]=r["adresinst"]
+
+mapAdres[r["id"]]=r["adresinst"]
+
 })
 
 csv2.forEach(r=>{
 
 let id=r["cusid"]
 
-if(map[id]){
+if(mapAdres[id]){
 
 merged.push({
 id:id,
-adresinst:map[id],
+adresinst:mapAdres[id],
 nazwa:r["nazwa"],
 grupa:r["grupa"],
 mac:r["mac"],
@@ -154,6 +222,7 @@ showTable()
 function showTable(){
 
 let tbody=document.querySelector("#resultTable tbody")
+
 tbody.innerHTML=""
 
 merged.forEach((r,i)=>{
@@ -176,21 +245,67 @@ tbody.appendChild(tr)
 
 }
 
-function downloadCSV(){
+function exportCSV(){
 
-let csv="LP;ID;AdresInst;Nazwa;Grupa;MAC;Serial\n"
+let rows=[
+["LP","ID","AdresInst","Nazwa","Grupa","MAC","Serial"]
+]
 
 merged.forEach((r,i)=>{
-csv+=`${i+1};${r.id};${r.adresinst};${r.nazwa};${r.grupa};${r.mac};${r.serial}\n`
+
+rows.push([
+i+1,
+r.id,
+r.adresinst,
+r.nazwa,
+r.grupa,
+r.mac,
+r.serial
+])
+
 })
 
-let blob=new Blob([csv],{type:"text/csv"})
+let csv=Papa.unparse(rows,{delimiter:";"})
+
+let blob=new Blob([csv],{type:"text/csv;charset=utf-8;"})
+
 let url=URL.createObjectURL(blob)
 
 let a=document.createElement("a")
+
 a.href=url
-a.download="wynik.csv"
+a.download="urzadzenia.csv"
 a.click()
+
+}
+
+function exportExcel(){
+
+let rows=[
+["LP","ID","AdresInst","Nazwa","Grupa","MAC","Serial"]
+]
+
+merged.forEach((r,i)=>{
+
+rows.push([
+i+1,
+r.id,
+r.adresinst,
+r.nazwa,
+r.grupa,
+r.mac,
+r.serial
+])
+
+})
+
+let wb=XLSX.utils.book_new()
+
+let ws=XLSX.utils.aoa_to_sheet(rows)
+
+XLSX.utils.book_append_sheet(wb,ws,"Urzadzenia")
+
+XLSX.writeFile(wb,"urzadzenia.xlsx")
 
 }
 
