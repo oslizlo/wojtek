@@ -31,6 +31,7 @@ Plik 2 (...;Cus. ID;...;MAC;Serial)<br>
 <br>
 
 <button onclick="mergeData()">Połącz dane</button>
+<button onclick="downloadCSV()">Pobierz CSV</button>
 
 <p id="info"></p>
 
@@ -38,6 +39,7 @@ Plik 2 (...;Cus. ID;...;MAC;Serial)<br>
 <thead>
 <tr>
 <th>ID</th>
+<th>AdresInst</th>
 <th>Nazwa</th>
 <th>Grupa</th>
 <th>MAC</th>
@@ -94,7 +96,6 @@ let reader=new FileReader()
 
 reader.onload=function(ev){
 csv1=parseCSV(ev.target.result)
-console.log("plik1",csv1)
 }
 
 reader.readAsText(e.target.files[0])
@@ -107,7 +108,6 @@ let reader=new FileReader()
 
 reader.onload=function(ev){
 csv2=parseCSV(ev.target.result)
-console.log("plik2",csv2)
 }
 
 reader.readAsText(e.target.files[0])
@@ -143,6 +143,7 @@ if(map[id]){
 
 merged.push({
 id:id,
+adresinst:r["adresinst"],
 nazwa:map[id].nazwa,
 grupa:map[id].grupa,
 mac:map[id].mac,
@@ -171,6 +172,7 @@ let tr=document.createElement("tr")
 
 tr.innerHTML=`
 <td>${r.id}</td>
+<td>${r.adresinst}</td>
 <td>${r.nazwa}</td>
 <td>${r.grupa}</td>
 <td>${r.mac}</td>
@@ -180,6 +182,24 @@ tr.innerHTML=`
 tbody.appendChild(tr)
 
 })
+
+}
+
+function downloadCSV(){
+
+let csv="ID;AdresInst;Nazwa;Grupa;MAC;Serial\n"
+
+merged.forEach(r=>{
+csv+=`${r.id};${r.adresinst};${r.nazwa};${r.grupa};${r.mac};${r.serial}\n`
+})
+
+let blob=new Blob([csv],{type:"text/csv"})
+let url=URL.createObjectURL(blob)
+
+let a=document.createElement("a")
+a.href=url
+a.download="wynik.csv"
+a.click()
 
 }
 
