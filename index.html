@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<title>Łączenie urządzeń</title>
+<title>Analiza urządzeń CSV</title>
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -24,7 +24,7 @@ margin-bottom:20px;
 }
 
 button{
-padding:8px 15px;
+padding:8px 14px;
 margin:5px;
 border:0;
 background:#1976d2;
@@ -41,6 +41,7 @@ table{
 width:100%;
 border-collapse:collapse;
 background:white;
+margin-top:10px;
 }
 
 th,td{
@@ -59,10 +60,8 @@ tbody tr:nth-child(even){
 background:#f2f2f2;
 }
 
-#search{
+input{
 padding:8px;
-width:300px;
-margin-top:10px;
 }
 
 </style>
@@ -70,32 +69,34 @@ margin-top:10px;
 
 <body>
 
-<h2>Łączenie urządzeń CSV</h2>
+<h2>Analiza urządzeń CSV</h2>
 
 <div class="panel">
 
-<div>
-Plik 1 (ID;AdresInst)<br>
+Plik instalacji (ID;AdresInst)<br>
 <input type="file" id="file1">
-</div>
 
-<br>
+<br><br>
 
-<div>
-Plik 2 (lista urządzeń)<br>
+Plik urządzeń<br>
 <input type="file" id="file2">
-</div>
 
-<br>
+<br><br>
 
 <button onclick="mergeData()">Połącz dane</button>
 <button onclick="removeLinkDevices()">Usuń D-LINK / TP-LINK</button>
+<button onclick="generateMissing()">Raport brakujących ID</button>
+<button onclick="generateDeviceCount()">Raport ilości urządzeń</button>
+<button onclick="generateDeviceTypes()">Raport typów urządzeń</button>
+
+<br><br>
+
 <button onclick="exportCSV()">Eksport CSV</button>
 <button onclick="exportExcel()">Eksport Excel</button>
 
 <br><br>
 
-<input type="text" id="search" placeholder="Szukaj ID / MAC / Serial / Nazwa / Grupa">
+<input type="text" id="search" placeholder="Szukaj...">
 
 <p id="info"></p>
 
@@ -105,7 +106,6 @@ Plik 2 (lista urządzeń)<br>
 
 <thead>
 <tr>
-<th onclick="sortTable('lp')">LP</th>
 <th onclick="sortTable('id')">ID</th>
 <th onclick="sortTable('adresinst')">AdresInst</th>
 <th onclick="sortTable('nazwa')">Nazwa</th>
@@ -119,15 +119,52 @@ Plik 2 (lista urządzeń)<br>
 
 </table>
 
+<h3>Brakujące ID</h3>
+
+<table id="missingTable">
+<thead>
+<tr>
+<th>ID</th>
+<th>AdresInst</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+
+<h3>Ilość urządzeń na ID</h3>
+
+<table id="countTable">
+<thead>
+<tr>
+<th>ID</th>
+<th>Ilość urządzeń</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+
+<h3>Typy urządzeń</h3>
+
+<table id="typeTable">
+<thead>
+<tr>
+<th>Typ</th>
+<th>Ilość</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+
 <script>
 
 let csv1=[]
 let csv2=[]
 let merged=[]
 let filtered=[]
+let missing=[]
 
 function normalizeHeader(h){
-return h.toLowerCase().replace(/\./g,"").replace(/ /g,"").trim()
+return h.toLowerCase().replace(/\./g,"").replace(/ /g,"")
 }
 
 function loadCSV(file,callback){
@@ -136,6 +173,7 @@ Papa.parse(file,{
 header:true,
 delimiter:";",
 skipEmptyLines:true,
+worker:true,
 
 complete:function(results){
 
@@ -174,22 +212,22 @@ merged=[]
 let mapAdres={}
 
 csv1.forEach(r=>{
-mapAdres[r["id"]]=r["adresinst"]
+mapAdres[r.id]=r.adresinst
 })
 
 csv2.forEach(r=>{
 
-let id=r["cusid"]
+let id=r.cusid
 
 if(mapAdres[id]){
 
 merged.push({
 id:id,
 adresinst:mapAdres[id],
-nazwa:r["nazwa"],
-grupa:r["grupa"],
-mac:r["mac"],
-serial:r["serial"]
+nazwa:r.nazwa,
+grupa:r.grupa,
+mac:r.mac,
+serial:r.serial
 })
 
 }
@@ -199,6 +237,33 @@ serial:r["serial"]
 filtered=[...merged]
 
 updateTable()
+
+}
+
+function updateTable(){
+
+let tbody=document.querySelector("#resultTable tbody")
+tbody.innerHTML=""
+
+filtered.forEach(r=>{
+
+let tr=document.createElement("tr")
+
+tr.innerHTML=`
+<td>${r.id}</td>
+<td>${r.adresinst}</td>
+<td>${r.nazwa}</td>
+<td>${r.grupa}</td>
+<td>${r.mac}</td>
+<td>${r.serial}</td>
+`
+
+tbody.appendChild(tr)
+
+})
+
+document.getElementById("info").innerText=
+"Liczba urządzeń: "+filtered.length
 
 }
 
@@ -213,69 +278,141 @@ updateTable()
 
 }
 
-function updateTable(){
-
-let tbody=document.querySelector("#resultTable tbody")
-
-tbody.innerHTML=""
-
-filtered.forEach((r,i)=>{
-
-let tr=document.createElement("tr")
-
-tr.innerHTML=`
-<td>${i+1}</td>
-<td>${r.id}</td>
-<td>${r.adresinst}</td>
-<td>${r.nazwa}</td>
-<td>${r.grupa}</td>
-<td>${r.mac}</td>
-<td>${r.serial}</td>
-`
-
-tbody.appendChild(tr)
-
-})
-
-document.getElementById("info").innerText =
-"Liczba urządzeń: "+filtered.length
-
-}
-
 document.getElementById("search").addEventListener("input",function(){
 
 let q=this.value.toLowerCase()
 
 filtered=merged.filter(r=>
-
-r.id.toLowerCase().includes(q) ||
-r.mac.toLowerCase().includes(q) ||
-r.serial.toLowerCase().includes(q) ||
-r.nazwa.toLowerCase().includes(q) ||
-r.grupa.toLowerCase().includes(q)
-
+r.id.toLowerCase().includes(q)||
+r.mac.toLowerCase().includes(q)||
+r.serial.toLowerCase().includes(q)||
+r.grupa.toLowerCase().includes(q)||
+r.nazwa.toLowerCase().includes(q)
 )
 
 updateTable()
 
 })
 
-function sortTable(key){
+function sortTable(col){
 
 filtered.sort((a,b)=>{
-return a[key].localeCompare(b[key])
+return a[col].localeCompare(b[col])
 })
 
 updateTable()
 
 }
 
+function generateMissing(){
+
+missing=[]
+
+let ids=new Set()
+
+csv2.forEach(r=>{
+ids.add(r.cusid)
+})
+
+csv1.forEach(r=>{
+
+if(!ids.has(r.id)){
+
+missing.push(r)
+
+}
+
+})
+
+let tbody=document.querySelector("#missingTable tbody")
+
+tbody.innerHTML=""
+
+missing.forEach(r=>{
+
+let tr=document.createElement("tr")
+
+tr.innerHTML=`
+<td>${r.id}</td>
+<td>${r.adresinst}</td>
+`
+
+tbody.appendChild(tr)
+
+})
+
+}
+
+function generateDeviceCount(){
+
+let counts={}
+
+merged.forEach(r=>{
+
+if(!counts[r.id]) counts[r.id]=0
+
+counts[r.id]++
+
+})
+
+let tbody=document.querySelector("#countTable tbody")
+
+tbody.innerHTML=""
+
+Object.keys(counts).forEach(id=>{
+
+let tr=document.createElement("tr")
+
+tr.innerHTML=`
+<td>${id}</td>
+<td>${counts[id]}</td>
+`
+
+tbody.appendChild(tr)
+
+})
+
+}
+
+function generateDeviceTypes(){
+
+let types={}
+
+merged.forEach(r=>{
+
+let g=r.grupa || "Inne"
+
+if(!types[g]) types[g]=0
+
+types[g]++
+
+})
+
+let tbody=document.querySelector("#typeTable tbody")
+
+tbody.innerHTML=""
+
+Object.keys(types).forEach(t=>{
+
+let tr=document.createElement("tr")
+
+tr.innerHTML=`
+<td>${t}</td>
+<td>${types[t]}</td>
+`
+
+tbody.appendChild(tr)
+
+})
+
+}
+
 function exportCSV(){
 
-let rows=[["LP","ID","AdresInst","Nazwa","Grupa","MAC","Serial"]]
+let rows=[["ID","AdresInst","Nazwa","Grupa","MAC","Serial"]]
 
-filtered.forEach((r,i)=>{
-rows.push([i+1,r.id,r.adresinst,r.nazwa,r.grupa,r.mac,r.serial])
+filtered.forEach(r=>{
+rows.push([r.id,r.adresinst,r.nazwa,r.grupa,r.mac,r.serial])
 })
 
 let csv=Papa.unparse(rows,{delimiter:";"})
@@ -294,10 +431,10 @@ a.click()
 
 function exportExcel(){
 
-let rows=[["LP","ID","AdresInst","Nazwa","Grupa","MAC","Serial"]]
+let rows=[["ID","AdresInst","Nazwa","Grupa","MAC","Serial"]]
 
-filtered.forEach((r,i)=>{
-rows.push([i+1,r.id,r.adresinst,r.nazwa,r.grupa,r.mac,r.serial])
+filtered.forEach(r=>{
+rows.push([r.id,r.adresinst,r.nazwa,r.grupa,r.mac,r.serial])
 })
 
 let wb=XLSX.utils.book_new()
